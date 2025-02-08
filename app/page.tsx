@@ -1,101 +1,154 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [isLogin, setIsLogin] = useState(true);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  return (
+    <div className="flex min-h-screen bg-white">
+      {/* Left side - Form */}
+      <div className="w-full lg:w-[520px] min-h-screen flex flex-col">
+        <div className="flex flex-col flex-grow px-5 pt-8 pb-6 sm:px-8 sm:pt-10 sm:pb-8">
+          {/* Logo section */}
+          <div>
+            <h1 className="text-[28px] font-semibold text-[#1A73E8]">
+              Workly
+            </h1>
+            <p className="text-[#5f6368] text-[16px] mt-1">
+              Welcome to the new way of work.
+            </p>
+          </div>
+
+          {/* Form section */}
+          <div className="flex-grow flex flex-col justify-center max-w-[400px] w-full mx-auto -mt-10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isLogin ? "login" : "register"}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full"
+              >
+                {/* Form header */}
+                <div className="mb-6">
+                  <h2 className="text-[24px] font-normal text-[#202124] mb-1">
+                    {isLogin ? "Welcome back" : "Create your account"}
+                  </h2>
+                  <p className="text-[14px] text-[#5f6368]">
+                    {isLogin
+                      ? "Sign in to continue to your workspace"
+                      : "Get started with your new workspace"}
+                  </p>
+                </div>
+
+                {/* Form inputs */}
+                <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+                  <AnimatePresence mode="wait">
+                    {!isLogin && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div>
+                          <label className="block text-[14px] text-[#5f6368] mb-1">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
+                            placeholder="Enter your full name"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div>
+                    <label className="block text-[14px] text-[#5f6368] mb-1">
+                      Email address
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[14px] text-[#5f6368] mb-1">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
+                      placeholder="Enter your password"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full h-[48px] bg-[#1a73e8] hover:bg-[#1557b0] text-white text-[16px] font-medium rounded-[4px] transition-colors mt-4"
+                  >
+                    {isLogin ? "Sign In" : "Create Account"}
+                  </button>
+                </form>
+
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={() => setIsLogin(!isLogin)}
+                    className="text-[14px] text-[#1a73e8] hover:text-[#1557b0] transition-colors"
+                  >
+                    {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+                  </button>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      {/* Right side - Hero */}
+      <div className="hidden lg:block flex-1 bg-[#1a73e8] relative">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20"></div>
+
+        <div className="relative h-full flex items-center p-12">
+          <div className="max-w-xl mx-auto">
+            <h2 className="text-[32px] font-semibold text-white mb-8">
+              Sign up to get full access to the Workly work hub:
+            </h2>
+
+            <div className="space-y-4">
+              {[
+                "Use search to find every work file across all your connected tools.",
+                "See projects, goals, and work updates for every person and team.",
+                "Create, assign or access workflows and protocols across every team."
+              ].map((text, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-start gap-3 bg-white/[0.08] rounded-lg p-4"
+                >
+                  <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                  <p className="text-[15px] text-white/90">{text}</p>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-white/10">
+              <p className="text-[15px] text-white/80">
+                Workly brings information from all your tools together.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

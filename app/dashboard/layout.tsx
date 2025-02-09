@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
     Home,
     LayoutGrid,
@@ -17,13 +19,24 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
-    Building2
+    Building2,
+    Folder
 } from 'lucide-react';
+import { projectsApi } from '@/app/services/projects';
+import { organizationsApi } from '@/app/services/organizations';
+import type { OrgRole } from '@/app/types/api';
+import { useUser } from '@/app/contexts/UserContext';
 
-interface Organization {
+interface DashboardOrg {
     id: string;
     name: string;
-    role: string;
+    role: OrgRole;
+}
+
+interface DashboardProject {
+    id: string;
+    name: string;
+    key: string;
 }
 
 export default function DashboardLayout({
@@ -31,32 +44,71 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const { user, logout } = useUser();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
+    const [currentOrg, setCurrentOrg] = useState<DashboardOrg | null>(null);
+    const [currentProject, setCurrentProject] = useState<DashboardProject | null>(null);
 
     const pathname = usePathname();
     const params = useParams();
     const orgId = params?.orgId as string;
+    const projectId = params?.projectId as string;
 
     useEffect(() => {
-        // Mock API call - replace with actual API call
-        if (orgId === 'personal') {
-            setCurrentOrg({
-                id: 'personal',
-                name: 'Personal Workspace',
-                role: 'Owner'
-            });
-        } else {
-            // Simulate API fetch
-            setCurrentOrg({
-                id: orgId,
-                name: 'Acme Corp',
-                role: 'Admin'
-            });
+        const fetchOrganization = async () => {
+            try {
+                if (orgId === 'personal') {
+                    setCurrentOrg({
+                        id: 'personal',
+                        name: 'Personal Workspace',
+                        role: 'OWNER'
+                    });
+                } else {
+                    const response = await organizationsApi.getById(orgId);
+                    const org = response.data.organization;
+                    setCurrentOrg({
+                        id: org.id,
+                        name: org.name,
+                        role: response.data.userRole
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching organization:', error);
+            }
+        };
+
+        if (orgId) {
+            fetchOrganization();
         }
     }, [orgId]);
+
+    useEffect(() => {
+        const fetchProject = async () => {
+            try {
+                if (projectId) {
+                    const response = await projectsApi.getById(projectId);
+                    const project = response.data.project;
+                    setCurrentProject({
+                        id: project.id,
+                        name: project.name,
+                        key: project.key
+                    });
+                } else {
+                    setCurrentProject(null);
+                }
+            } catch (error) {
+                console.error('Error fetching project:', error);
+            }
+        };
+
+        if (projectId) {
+            fetchProject();
+        } else {
+            setCurrentProject(null);
+        }
+    }, [projectId]);
 
     const menuItems = [
         { icon: Home, label: 'Dashboard', href: `/dashboard/${orgId}` },
@@ -74,6 +126,7 @@ export default function DashboardLayout({
 
     return (
         <div className="min-h-screen bg-gray-50">
+            <ToastContainer position="bottom-right" />
             {/* Top Navigation */}
             <header className="h-14 bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30">
                 <div className="h-full px-4 flex items-center justify-between">
@@ -102,6 +155,20 @@ export default function DashboardLayout({
                                 <p className="text-xs text-gray-500">{currentOrg.role}</p>
                             </div>
                         </div>
+                        {currentProject && (
+                            <>
+                                <div className="h-6 w-px bg-gray-200 mx-2"></div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <Folder size={18} className="text-purple-600" />
+                                    </div>
+                                    <div className="hidden sm:block">
+                                        <h3 className="text-sm font-medium text-gray-900">{currentProject.name}</h3>
+                                        <p className="text-xs text-gray-500">Project {currentProject.key}</p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Right section */}
@@ -116,7 +183,7 @@ export default function DashboardLayout({
                                 className="flex items-center gap-2 hover:bg-gray-100 p-1.5 rounded-md"
                             >
                                 <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
-                                    JS
+                                    {user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
                                 </div>
                                 <ChevronDown size={16} />
                             </button>
@@ -130,12 +197,13 @@ export default function DashboardLayout({
                                         className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                                     >
                                         <div className="px-4 py-2 border-b border-gray-100">
-                                            <p className="text-sm font-medium">John Smith</p>
-                                            <p className="text-xs text-gray-500">john@example.com</p>
+                                            <p className="text-sm font-medium">{user?.name || 'Unknown User'}</p>
+                                            <p className="text-xs text-gray-500">{user?.email || 'No email'}</p>
                                         </div>
                                         <Link
                                             href="/profile"
                                             className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                            onClick={() => setIsProfileOpen(false)}
                                         >
                                             <Settings size={16} />
                                             Profile Settings
@@ -143,11 +211,18 @@ export default function DashboardLayout({
                                         <Link
                                             href="/organizations"
                                             className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                            onClick={() => setIsProfileOpen(false)}
                                         >
                                             <Building2 size={16} />
                                             Switch Organization
                                         </Link>
-                                        <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50">
+                                        <button
+                                            onClick={async () => {
+                                                await logout();
+                                                setIsProfileOpen(false);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                                        >
                                             <LogOut size={16} />
                                             Sign Out
                                         </button>

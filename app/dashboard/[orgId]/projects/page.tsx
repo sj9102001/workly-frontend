@@ -1,215 +1,227 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, MoreHorizontal, Clock, MessageSquare, Paperclip } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Plus, Folder, Archive, Search } from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-interface Task {
-    id: string;
-    title: string;
-    description: string;
-    priority: 'High' | 'Medium' | 'Low';
-    assignee: string;
-    comments: number;
-    attachments: number;
-    dueDate: string;
-}
-
-interface Column {
-    title: string;
-    items: Task[];
-}
-
-interface Columns {
-    [key: string]: Column;
-}
-
-const initialColumns: Columns = {
-    todo: {
-        title: 'To Do',
-        items: [
-            {
-                id: '1',
-                title: 'Design System Updates',
-                description: 'Update the design system with new components',
-                priority: 'High',
-                assignee: 'Sarah Chen',
-                comments: 3,
-                attachments: 2,
-                dueDate: '2 days',
-            },
-            {
-                id: '2',
-                title: 'API Documentation',
-                description: 'Write documentation for the new API endpoints',
-                priority: 'Medium',
-                assignee: 'Mike Wilson',
-                comments: 1,
-                attachments: 0,
-                dueDate: '3 days',
-            },
-        ],
-    },
-    inProgress: {
-        title: 'In Progress',
-        items: [
-            {
-                id: '3',
-                title: 'User Authentication',
-                description: 'Implement OAuth2 authentication flow',
-                priority: 'High',
-                assignee: 'John Smith',
-                comments: 5,
-                attachments: 1,
-                dueDate: '1 day',
-            },
-        ],
-    },
-    review: {
-        title: 'Review',
-        items: [
-            {
-                id: '4',
-                title: 'Dashboard Analytics',
-                description: 'Add analytics charts to the dashboard',
-                priority: 'Medium',
-                assignee: 'Anna Johnson',
-                comments: 2,
-                attachments: 3,
-                dueDate: 'Today',
-            },
-        ],
-    },
-    done: {
-        title: 'Done',
-        items: [
-            {
-                id: '5',
-                title: 'Email Templates',
-                description: 'Create email templates for notifications',
-                priority: 'Low',
-                assignee: 'Tom Brown',
-                comments: 4,
-                attachments: 1,
-                dueDate: 'Completed',
-            },
-        ],
-    },
-};
+import { projectsApi } from '@/app/services/projects';
+import Button from '@/app/components/Button';
+import Card from '@/app/components/Card';
+import Modal from '@/app/components/Modal';
+import type { Project } from '@/app/types/api';
 
 export default function ProjectsPage() {
-    const [columns, setColumns] = useState<Columns>(initialColumns);
-    const [draggingItem, setDraggingItem] = useState<Task | null>(null);
-    const [draggingColumn, setDraggingColumn] = useState<string | null>(null);
+    const params = useParams();
+    const router = useRouter();
+    const orgId = params.orgId as string;
 
-    const handleDragStart = (item: Task, columnId: string) => {
-        setDraggingItem(item);
-        setDraggingColumn(columnId);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [newProjectName, setNewProjectName] = useState('');
+    const [newProjectDescription, setNewProjectDescription] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const fetchProjects = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await projectsApi.getOrganizationProjects(orgId);
+            setProjects(response.data.projects);
+        } catch (error: unknown) {
+            const err = error as Error;
+            toast.error(err.message || 'Failed to fetch projects');
+            console.error('Error fetching projects:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [orgId]);
+
+    useEffect(() => {
+        fetchProjects();
+    }, [fetchProjects]);
+
+    const handleCreateProject = async () => {
+        if (!newProjectName.trim()) return;
+
+        try {
+            setCreating(true);
+            await projectsApi.create(orgId, {
+                name: newProjectName,
+                description: newProjectDescription,
+                key: newProjectName.substring(0, 4).toUpperCase(),
+            });
+            toast.success('Project created successfully');
+            setShowCreateModal(false);
+            setNewProjectName('');
+            setNewProjectDescription('');
+            fetchProjects();
+        } catch (error: unknown) {
+            const err = error as Error;
+            toast.error(err.message || 'Failed to create project');
+            console.error('Error creating project:', error);
+        } finally {
+            setCreating(false);
+        }
     };
 
-    const handleDragOver = (e: React.DragEvent, columnId: string) => {
-        e.preventDefault();
-        if (!draggingItem || !draggingColumn || draggingColumn === columnId) return;
+    const handleProjectClick = (projectId: string) => {
+        router.push(`/dashboard/${orgId}/projects/${projectId}`);
+    };
 
-        const newColumns = { ...columns };
-        const sourceItems = [...newColumns[draggingColumn].items];
-        const destItems = [...newColumns[columnId].items];
+    const filteredProjects = projects.filter(project =>
+        project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-        const [removedItem] = sourceItems.splice(
-            sourceItems.findIndex((item) => item.id === draggingItem.id),
-            1
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
         );
-        destItems.push(removedItem);
-
-        newColumns[draggingColumn].items = sourceItems;
-        newColumns[columnId].items = destItems;
-
-        setColumns(newColumns);
-        setDraggingColumn(columnId);
-    };
+    }
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">Project Board</h1>
-                    <p className="text-sm text-gray-500">Manage and track your project tasks.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+                    <p className="text-sm text-gray-500 mt-1">Manage and organize your team&apos;s projects</p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    <Plus size={18} />
-                    Add Task
-                </button>
+                <Button onClick={() => setShowCreateModal(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Project
+                </Button>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-4">
-                {Object.entries(columns).map(([columnId, column]) => (
-                    <div
-                        key={columnId}
-                        className="flex-shrink-0 w-72 bg-gray-50 rounded-lg border border-gray-200"
-                        onDragOver={(e) => handleDragOver(e, columnId)}
-                    >
-                        <div className="p-3 border-b border-gray-200">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-medium text-gray-900">{column.title}</h3>
-                                <span className="text-sm text-gray-500">{column.items.length}</span>
-                            </div>
-                        </div>
-                        <div className="p-2 space-y-2">
-                            {column.items.map((item) => (
-                                <motion.div
-                                    key={item.id}
-                                    layoutId={item.id}
-                                    draggable
-                                    onDragStart={() => handleDragStart(item, columnId)}
-                                    className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm cursor-move hover:shadow-md transition-shadow"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <h4 className="font-medium text-gray-900 text-sm">{item.title}</h4>
-                                        <button className="text-gray-400 hover:text-gray-600 flex-shrink-0">
-                                            <MoreHorizontal size={16} />
-                                        </button>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <div className="flex items-center gap-1 text-gray-500">
-                                            <Clock size={12} />
-                                            <span className="text-xs">{item.dueDate}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-gray-500">
-                                            <MessageSquare size={12} />
-                                            <span className="text-xs">{item.comments}</span>
-                                        </div>
-                                        {item.attachments > 0 && (
-                                            <div className="flex items-center gap-1 text-gray-500">
-                                                <Paperclip size={12} />
-                                                <span className="text-xs">{item.attachments}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs">
-                                                {item.assignee.split(' ').map(n => n[0]).join('')}
-                                            </div>
-                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.assignee}</span>
-                                        </div>
-                                        <span
-                                            className={`text-xs px-1.5 py-0.5 rounded-full ${item.priority === 'High'
-                                                ? 'bg-red-100 text-red-700'
-                                                : item.priority === 'Medium'
-                                                    ? 'bg-yellow-100 text-yellow-700'
-                                                    : 'bg-green-100 text-green-700'
-                                                }`}
-                                        >
-                                            {item.priority}
-                                        </span>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+            {/* Search and filters */}
+            <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                    type="text"
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
             </div>
+
+            {filteredProjects.length === 0 ? (
+                <Card className="p-12 text-center">
+                    <Folder className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        {searchQuery ? 'No projects found' : 'No projects yet'}
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                        {searchQuery
+                            ? 'Try adjusting your search terms'
+                            : 'Get started by creating your first project.'}
+                    </p>
+                    {!searchQuery && (
+                        <Button onClick={() => setShowCreateModal(true)}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Project
+                        </Button>
+                    )}
+                </Card>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProjects.map((project) => (
+                        <Card
+                            key={project.id}
+                            onClick={() => handleProjectClick(project.id)}
+                            className="cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                        >
+                            <div className="p-6">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
+                                            {project.name}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 line-clamp-2 mb-4">
+                                            {project.description || 'No description'}
+                                        </p>
+                                    </div>
+                                    {project.isArchived && (
+                                        <Archive className="w-5 h-5 text-gray-400 flex-shrink-0 ml-4" />
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center space-x-4 text-gray-500">
+                                        <span>{project.issues?.length || 0} issues</span>
+                                        <span>{project.members?.length || 0} members</span>
+                                    </div>
+                                    <span className="text-gray-400">{project.key}</span>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            <Modal
+                isOpen={showCreateModal}
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setNewProjectName('');
+                    setNewProjectDescription('');
+                }}
+                title="Create New Project"
+            >
+                <div className="space-y-6">
+                    <div>
+                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                            Project Name
+                        </label>
+                        <input
+                            type="text"
+                            id="name"
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter project name"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                            Description
+                        </label>
+                        <textarea
+                            id="description"
+                            value={newProjectDescription}
+                            onChange={(e) => setNewProjectDescription(e.target.value)}
+                            rows={4}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                            placeholder="Enter project description"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setShowCreateModal(false);
+                                setNewProjectName('');
+                                setNewProjectDescription('');
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleCreateProject}
+                            disabled={creating || !newProjectName.trim()}
+                        >
+                            {creating ? 'Creating...' : 'Create Project'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <ToastContainer position="bottom-right" />
         </div>
     );
 } 

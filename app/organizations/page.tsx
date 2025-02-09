@@ -1,75 +1,139 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
     Plus,
     Building2,
     Users,
     Mail,
     ChevronRight,
-    Briefcase,
-    UserCircle
+    UserCircle,
+    Loader2
 } from 'lucide-react';
+import { organizationsApi } from '@/app/services/organizations';
+import type { Organization, OrganizationInvite } from '@/app/types/api';
+import Modal from '@/app/components/Modal';
 
 export default function OrganizationsPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [personalOrg, setPersonalOrg] = useState<Organization | null>(null);
+    const [invitations, setInvitations] = useState<OrganizationInvite[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [newOrgName, setNewOrgName] = useState('');
+    const [newOrgDescription, setNewOrgDescription] = useState('');
+
     const router = useRouter();
 
-    // Mock data - replace with actual API calls
-    const organizations = [
-        {
-            id: '1',
-            name: 'Acme Corp',
-            members: 24,
-            role: 'Admin',
-        },
-        {
-            id: '2',
-            name: 'Startup Inc',
-            members: 12,
-            role: 'Member',
-        }
-    ];
+    useEffect(() => {
+        fetchOrganizations();
+    }, []);
 
-    const invitations = [
-        {
-            id: '1',
-            organizationName: 'Tech Solutions',
-            invitedBy: 'Sarah Chen',
-            role: 'Member',
+    const fetchOrganizations = async () => {
+        try {
+            const response = await organizationsApi.getAll();
+            setOrganizations(response.data.organizations);
+            setPersonalOrg(response.data.personalOrganization);
+            setInvitations(response.data.pendingInvites);
+        } catch (error: unknown) {
+            const err = error as Error;
+            console.error('Error fetching organizations:', err);
+            toast.error(err.message || 'Failed to load organizations');
+        } finally {
+            setLoading(false);
         }
-    ];
+    };
+
+    const handleCreateOrganization = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCreating(true);
+
+        try {
+            await organizationsApi.create({
+                name: newOrgName,
+                description: newOrgDescription
+            });
+
+            toast.success('Organization created successfully');
+            setShowCreateModal(false);
+            setNewOrgName('');
+            setNewOrgDescription('');
+            await fetchOrganizations();
+        } catch (error: unknown) {
+            const err = error as Error;
+            toast.error(err.message || 'Failed to create organization');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleAcceptInvite = async (inviteId: string) => {
+        try {
+            await organizationsApi.acceptInvite(inviteId);
+            toast.success('Invitation accepted');
+            await fetchOrganizations();
+        } catch (error: unknown) {
+            const err = error as Error;
+            toast.error(err.message || 'Failed to accept invitation');
+        }
+    };
+
+    const handleRejectInvite = async (inviteId: string) => {
+        try {
+            await organizationsApi.rejectInvite(inviteId);
+            toast.success('Invitation rejected');
+            await fetchOrganizations();
+        } catch (error: unknown) {
+            const err = error as Error;
+            toast.error(err.message || 'Failed to reject invitation');
+        }
+    };
 
     const handleOrganizationSelect = (orgId: string) => {
         router.push(`/dashboard/${orgId}`);
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+            <ToastContainer position="bottom-right" />
             <div className="max-w-4xl mx-auto space-y-8">
                 <div className="text-center">
                     <h1 className="text-3xl font-bold text-gray-900">Welcome to Workly</h1>
                     <p className="mt-2 text-lg text-gray-600">Select an organization to continue or create a new one</p>
                 </div>
 
-                {/* Personal Workspace Option */}
-                <div className="bg-white rounded-lg border border-gray-200 hover:border-blue-500 transition-colors cursor-pointer p-6"
-                    onClick={() => handleOrganizationSelect('personal')}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <UserCircle size={24} className="text-blue-600" />
+                {/* Personal Organization */}
+                {personalOrg && (
+                    <div
+                        onClick={() => handleOrganizationSelect(personalOrg.id)}
+                        className="bg-white rounded-lg border border-gray-200 hover:border-blue-500 transition-colors cursor-pointer p-6"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <UserCircle size={24} className="text-blue-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-medium text-gray-900">{personalOrg.name}</h3>
+                                    <p className="text-sm text-gray-500">{personalOrg.description}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-lg font-medium text-gray-900">Personal Workspace</h3>
-                                <p className="text-sm text-gray-500">Your individual workspace for personal projects</p>
-                            </div>
+                            <ChevronRight size={20} className="text-gray-400" />
                         </div>
-                        <ChevronRight size={20} className="text-gray-400" />
                     </div>
-                </div>
+                )}
 
                 {/* Organizations List */}
                 {organizations.length > 0 && (
@@ -92,12 +156,15 @@ export default function OrganizationsPage() {
                                                 <div className="flex items-center gap-4 mt-1">
                                                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
                                                         <Users size={16} />
-                                                        <span>{org.members} members</span>
+                                                        <span>{org.memberCount} members</span>
                                                     </div>
                                                     <div className="text-sm font-medium text-blue-600">
-                                                        {org.role}
+                                                        {org.role && `${org.role.charAt(0)}${org.role.slice(1).toLowerCase()}`}
                                                     </div>
                                                 </div>
+                                                {org.description && (
+                                                    <p className="text-sm text-gray-500 mt-1">{org.description}</p>
+                                                )}
                                             </div>
                                         </div>
                                         <ChevronRight size={20} className="text-gray-400" />
@@ -124,17 +191,23 @@ export default function OrganizationsPage() {
                                                 <Mail size={24} className="text-yellow-600" />
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-medium text-gray-900">{invitation.organizationName}</h3>
-                                                <p className="text-sm text-gray-500">
-                                                    Invited by {invitation.invitedBy} • {invitation.role}
-                                                </p>
+                                                <h3 className="text-lg font-medium text-gray-900">{invitation.organization.name}</h3>
+                                                {invitation.organization.description && (
+                                                    <p className="text-sm text-gray-500">{invitation.organization.description}</p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <button className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                                            <button
+                                                onClick={() => handleRejectInvite(invitation.id)}
+                                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                                            >
                                                 Decline
                                             </button>
-                                            <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                                            <button
+                                                onClick={() => handleAcceptInvite(invitation.id)}
+                                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                            >
                                                 Accept
                                             </button>
                                         </div>
@@ -157,48 +230,60 @@ export default function OrganizationsPage() {
                 </div>
 
                 {/* Create Organization Modal */}
-                <AnimatePresence>
-                    {showCreateModal && (
-                        <>
-                            <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setShowCreateModal(false)} />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-lg shadow-lg z-50 p-6"
+                <Modal
+                    isOpen={showCreateModal}
+                    onClose={() => setShowCreateModal(false)}
+                    title="Create Organization"
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleCreateOrganization}>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Organization Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newOrgName}
+                                    onChange={(e) => setNewOrgName(e.target.value)}
+                                    required
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter organization name"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Description (Optional)
+                                </label>
+                                <textarea
+                                    value={newOrgDescription}
+                                    onChange={(e) => setNewOrgDescription(e.target.value)}
+                                    rows={3}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter organization description"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateModal(false)}
+                                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                                disabled={creating}
                             >
-                                <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Organization</h2>
-                                <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Organization Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            placeholder="Enter organization name"
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-end gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCreateModal(false)}
-                                            className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                        >
-                                            Create
-                                        </button>
-                                    </div>
-                                </form>
-                            </motion.div>
-                        </>
-                    )}
-                </AnimatePresence>
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={creating || !newOrgName.trim()}
+                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {creating && <Loader2 size={16} className="animate-spin" />}
+                                {creating ? 'Creating...' : 'Create'}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
             </div>
         </div>
     );

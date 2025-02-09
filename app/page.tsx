@@ -1,10 +1,124 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useUser } from "./contexts/UserContext";
+
+interface ApiError {
+  message: string;
+}
 
 export default function Home() {
   const [isLogin, setIsLogin] = useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { user, setUser } = useUser();
+
+  useEffect(() => {
+    // Get the callback URL from the URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const callbackUrl = params.get('callbackUrl');
+
+    // If user is already logged in, redirect to callback URL or organizations page
+    if (user) {
+      router.push(callbackUrl || '/organizations');
+    }
+  }, [user, router]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    // Get the callback URL from the URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const callbackUrl = params.get('callbackUrl');
+
+    if (isLogin) {
+      try {
+        const res = await fetch("http://localhost:8080/api/auth/login", {
+          method: "POST",
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || "Invalid email or password");
+        }
+
+        // Store user data in context and localStorage
+        setUser(data.data.user);
+        router.push(callbackUrl || "/organizations");
+      } catch (error) {
+        const err = error as Error | ApiError;
+        setError('message' in err ? err.message : "Something went wrong. Please try again.");
+      }
+    } else {
+      try {
+        const name = formData.get("name") as string;
+        const res = await fetch("http://localhost:8080/api/auth/signup", {
+          method: "POST",
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(data.message || "Something went wrong");
+          setLoading(false);
+          return;
+        }
+
+        // Auto login after successful registration
+        const loginRes = await fetch("http://localhost:8080/api/auth/login", {
+          method: "POST",
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        });
+
+        const loginData = await loginRes.json();
+
+        if (!loginRes.ok) {
+          setError("Registration successful. Please login.");
+        } else {
+          // Store user data in context and localStorage
+          setUser(loginData.data.user);
+          router.push(callbackUrl || "/organizations");
+        }
+      } catch (error) {
+        const err = error as Error | ApiError;
+        setError('message' in err ? err.message : "Something went wrong");
+      }
+    }
+    setLoading(false);
+  };
 
   return (
     <div className="flex min-h-screen bg-white">
@@ -44,8 +158,14 @@ export default function Home() {
                   </p>
                 </div>
 
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+                    {error}
+                  </div>
+                )}
+
                 {/* Form inputs */}
-                <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+                <form className="space-y-5" onSubmit={handleSubmit}>
                   <AnimatePresence mode="wait">
                     {!isLogin && (
                       <motion.div
@@ -60,6 +180,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            name="name"
+                            required
                             className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
                             placeholder="Enter your full name"
                           />
@@ -74,6 +196,8 @@ export default function Home() {
                     </label>
                     <input
                       type="email"
+                      name="email"
+                      required
                       className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
                       placeholder="Enter your email"
                     />
@@ -85,6 +209,8 @@ export default function Home() {
                     </label>
                     <input
                       type="password"
+                      name="password"
+                      required
                       className="w-full h-[48px] px-3 bg-[#f8f9fa] text-[16px] text-[#202124] rounded-lg border border-[#dadce0] focus:border-[#1a73e8] focus:ring-4 focus:ring-[#1a73e8]/10 outline-none transition-all"
                       placeholder="Enter your password"
                     />
@@ -92,15 +218,19 @@ export default function Home() {
 
                   <button
                     type="submit"
-                    className="w-full h-[48px] bg-[#1a73e8] hover:bg-[#1557b0] text-white text-[16px] font-medium rounded-[4px] transition-colors mt-4"
+                    disabled={loading}
+                    className="w-full h-[48px] bg-[#1a73e8] hover:bg-[#1557b0] text-white text-[16px] font-medium rounded-[4px] transition-colors mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLogin ? "Sign In" : "Create Account"}
+                    {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
                   </button>
                 </form>
 
                 <div className="mt-6 text-center">
                   <button
-                    onClick={() => setIsLogin(!isLogin)}
+                    onClick={() => {
+                      setIsLogin(!isLogin);
+                      setError("");
+                    }}
                     className="text-[14px] text-[#1a73e8] hover:text-[#1557b0] transition-colors"
                   >
                     {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
